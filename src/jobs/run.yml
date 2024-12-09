@@ -2,14 +2,13 @@ description: |
     Simple drop-in job to run commands for your Node.js application automatically.
 
 parameters:
-    version:
-        type: string
-        default: 'lts'
-        description: >
-            Pick a specific cimg/node image version tag: https://hub.docker.com/r/cimg/node
+    parallelism:
+        type: integer
+        default: 1
+        description: The number of parallel jobs to run. See https://circleci.com/docs/parallelism-faster-jobs/
     pkg-manager:
         type: enum
-        enum: ['npm', 'yarn', 'yarn-berry']
+        enum: ['npm', 'yarn', 'yarn-berry', 'pnpm']
         default: 'npm'
         description: Select the default node package manager to use.
     cache-version:
@@ -20,11 +19,19 @@ parameters:
         type: steps
         description: Provide any optional steps you would like to run prior to installing the node dependencies. This is a good place to install global modules.
         default: []
+    post_install_steps:
+        type: steps
+        description: Provide any optional steps you would like to run after installing the node dependencies.
+        default: []
     npm-run:
         type: string
         default: ''
         description: The name of the script within your package.json which you would like to run.
     yarn-run:
+        type: string
+        default: ''
+        description: The name of the script within your package.json which you would like to run.
+    pnpm-run:
         type: string
         default: ''
         description: The name of the script within your package.json which you would like to run.
@@ -38,24 +45,74 @@ parameters:
             Optionally supply a custom package installation command, with any additional flags needed.
         type: string
         default: ''
+    artifacts-path:
+        description: |
+            Path to a file or directory to upload to artifacts after running the script.
+        type: string
+        default: ''
+    include-branch-in-cache-key:
+        type: boolean
+        default: false
+        description: >
+            If true, this cache bucket will only apply to jobs within the same branch.
+    cache-path:
+        description: |
+            By default, this orb will utilize 'npm ci' and cache the '~/.npm' directory. Override which path to cache with this parameter.
+            The cache will be ignored when using npm ci, as the command doesn't benefit from cache.
+        type: string
+        default: ''
+    cache-only-lockfile:
+        type: boolean
+        default: true
+        description: |
+            If true, package.json will be ignored in the cache key. Useful for projects where package.json changes do not always invalidate dependencies.
+            Note: package.json will still be the final fallback key incase a project is not configured with a lock file.
+    with-cache:
+        type: boolean
+        default: true
+        description: |
+            Cache your node packages automatically for faster install times.
+            Cache will be ignored when using npm ci.
+    check-cache:
+        type: enum
+        default: 'never'
+        enum: ['never', 'always', 'detect']
+        description: |
+            Yarn berry only for Zero install support -
+            Use 'always' to always --check-cache argument to yarn install.
+            Use 'detect' to enable caching of yarn.lock and to only add when required.
+    executor:
+        type: executor
+        default: default
+        description: The name of executor to use.
 
-executor:
-    name: default
-    tag: << parameters.version >>
-
+executor: <<parameters.executor>>
+parallelism: <<parameters.parallelism>>
 steps:
     - checkout
     - steps: << parameters.setup >>
     - install-packages:
-          app-dir: <<parameters.app-dir>>
-          pkg-manager: <<parameters.pkg-manager>>
-          cache-version: <<parameters.cache-version>>
-          override-ci-command: <<parameters.override-ci-command>>
+        app-dir: <<parameters.app-dir>>
+        pkg-manager: <<parameters.pkg-manager>>
+        cache-version: <<parameters.cache-version>>
+        override-ci-command: <<parameters.override-ci-command>>
+        include-branch-in-cache-key: <<parameters.include-branch-in-cache-key>>
+        cache-path: <<parameters.cache-path>>
+        cache-only-lockfile: <<parameters.cache-only-lockfile>>
+        with-cache: <<parameters.with-cache>>
+        check-cache: <<parameters.check-cache>>
+    - steps: << parameters.post_install_steps >>
     - run:
-          name: Run <<parameters.pkg-manager>> <<parameters.npm-run>>
-          working_directory: <<parameters.app-dir>>
-          environment:
-              ORB_PARAM_PKG_MANAGER: <<parameters.pkg-manager>>
-              ORB_PARAM_NPM_RUN: <<parameters.npm-run>>
-              ORB_PARAM_YARN_RUN: <<parameters.yarn-run>>
-          command: <<include(scripts/run-commands-with.sh)>>
+        name: Run <<parameters.pkg-manager>> <<parameters.npm-run>>
+        working_directory: <<parameters.app-dir>>
+        environment:
+            ORB_PARAM_PKG_MANAGER: <<parameters.pkg-manager>>
+            ORB_PARAM_NPM_RUN: <<parameters.npm-run>>
+            ORB_PARAM_YARN_RUN: <<parameters.yarn-run>>
+            ORB_PARAM_PNPM_RUN: <<parameters.pnpm-run>>
+        command: <<include(scripts/run-commands-with.sh)>>
+    - when:
+        condition: <<parameters.artifacts-path>>
+        steps:
+            - store_artifacts:
+                path: <<parameters.artifacts-path>>
