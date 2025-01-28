@@ -1,5 +1,5 @@
 description: |
-    Install custom versions of Node.js, and optionally NPM/Yarn, in any
+    Install custom versions of Node.js, and optionally NPM/pnpm/Yarn, in any
     execution environment (Docker/Linux, macOS, machine) that does not have
     it preinstalled.
 
@@ -12,15 +12,22 @@ parameters:
         default: ''
         description: >
             Specify the full version tag to install. To install the latest version, set the version to `latest`.
-            If unspecified, the version listed in .nvmrc will be installed. If no .nvmrc file exists the active LTS version of Node.js will be installed by default.
+            If unspecified, the version listed in .nvmrc or .node-version will be installed. If no .nvmrc file and .node-version file exists the active LTS version of Node.js will be installed by default.
             For a full list of releases, see the following: https://nodejs.org/en/download/releases
 
-    node-install-dir:
-        type: string
-        default: /usr/local
-        description: >
-            Where should Node.js be installed?
+    # pnpm
+    install-pnpm:
+        type: boolean
+        default: false
+        description: Install pnpm?
 
+    pnpm-version:
+        type: string
+        default: ''
+        description: >
+            Pick a version of pnpm to install (if no version is specified,
+            the latest stable version will be installed):
+            https://github.com/pnpm/pnpm/releases
     # yarn
     install-yarn:
         type: boolean
@@ -34,16 +41,52 @@ parameters:
             Pick a version of Yarn to install (if no version is specified,
             the latest stable version will be installed):
             https://github.com/yarnpkg/yarn/releases
-
+    use-nvm-cache:
+        type: boolean
+        default: true
+        description: >
+            Indicates if cache would be used when installing nodejs,
+            this would reduce the amount of errors when downloading the binaries.
+            Defaults to true.
+    nvm-cache-key:
+        type: string
+        default: nvm-v1-cache
+        description: >
+            Cache key to use when downloading nodejs.
+            This is only used when use-nvm-cache is set to true.
+            Defaults to nvm-v1-cache, update this value if you need to restart the cache.
+            The node-version is added by default at the end of the cache key.
+            If you are using multiple executors, add the executor as part of the key.
 steps:
+    - when:
+        condition: <<parameters.use-nvm-cache>>
+        steps:
+            - restore_cache:
+                name: Restore Nvm Cache
+                keys:
+                - <<parameters.nvm-cache-key>>-<<parameters.node-version>>-{{ arch }}
     - run:
-          name: Install Node.js <<parameters.node-version>>
-          environment:
-              NODE_PARAM_VERSION: <<parameters.node-version>>
-          command: <<include(scripts/install-nvm.sh)>>
+        name: Install Node.js <<parameters.node-version>>
+        environment:
+            NODE_PARAM_VERSION: <<parameters.node-version>>
+        command: <<include(scripts/install-nvm.sh)>>
+    - when:
+        condition: <<parameters.use-nvm-cache>>
+        steps:
+            - save_cache:
+                name: Save Nvm Cache
+                key: <<parameters.nvm-cache-key>>-<<parameters.node-version>>-{{ arch }}
+                paths:
+                - ~/.nvm/.cache
+                - /opt/circleci/.nvm/.cache
+    - when:
+        condition: <<parameters.install-pnpm>>
+        steps:
+            - install-pnpm:
+                version: <<parameters.pnpm-version>>
 
     - when:
-          condition: <<parameters.install-yarn>>
-          steps:
-              - install-yarn:
-                    version: <<parameters.yarn-version>>
+        condition: <<parameters.install-yarn>>
+        steps:
+            - install-yarn:
+                version: <<parameters.yarn-version>>

@@ -1,3 +1,8 @@
+#!/usr/bin/env bash
+if ! corepack enable; then
+    echo "Using alternative corepack location"
+    corepack enable --install-directory ~/bin
+fi
 # Run override ci command if provided, otherwise run default yarn install
 # See: https://yarnpkg.com/configuration/yarnrc/#cacheFolder
 if [[ -n "$PARAM_CACHE_PATH" ]]; then
@@ -31,12 +36,12 @@ else
             set -- "$@" --check-cache
         fi
 
-        yarn install --immutable --immutable-cache "$@"
+        echo y | yarn install --immutable --immutable-cache "$@"
 
         if [[ "$PARAM_CHECK_CACHE" == "detect" && -n "$ENABLE_CHECK_CACHE" ]]; then
             cp yarn.lock "$YARN_LOCKFILE_PATH"
         fi
     else
-        yarn install --immutable
+        echo y | yarn install --immutable
     fi
 fi

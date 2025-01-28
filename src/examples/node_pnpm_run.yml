@@ -1,6 +1,6 @@
 description: |
-    Drop-in solution to automatically run custom yarn commands for your Node.js applications.
-    This job will automatically download your code into any version node environment, install your dependencies with caching enabled, and execute your custom yarn script.
+    Drop-in solution to automatically run custom pnpm commands for your Node.js applications.
+    This job will automatically download your code into any version node environment, install your dependencies with caching enabled, and execute your custom pnpm script.
 usage:
     version: 2.1
     orbs:
@@ -9,6 +9,6 @@ usage:
         run-npm-command:
             jobs:
                 - node/run:
-                    yarn-run: build
+                    pnpm-run: build
                     executor:
                         name: node/default
